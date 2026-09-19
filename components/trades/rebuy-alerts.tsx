@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Trade, CoinGeckoPrice } from '@/lib/types'
 import { formatCurrency } from '@/lib/calculations'
+import { computeRebuyAlerts } from '@/lib/rebuy'
 
 
 interface RebuyAlertsProps {
@@ -18,19 +19,6 @@ interface RebuyAlertsProps {
   onRestoreRebuy: (tradeId: string, realizationId: string) => void
 }
 
-interface RebuyAlert {
-  trade: Trade
-  realizationId: string
-  targetLevel: number
-  realizationPrice: number
-  triggerPrice: number
-  currentPrice: number
-  realizationValue: number
-  suggestedQuantity: number
-}
-
-const REBUY_DROP_PERCENTAGE = 1
-
 export function RebuyAlerts({
   trades,
   prices,
@@ -40,67 +28,7 @@ export function RebuyAlerts({
   onRestoreRebuy,
 }: RebuyAlertsProps) {
 
-  const currencyKey = currency.toLowerCase() as 'usd' | 'brl'
-
-  const alerts: RebuyAlert[] = []
-  const dismissedAlerts: RebuyAlert[] = []
-
-  // Todas as recompras já realizadas
-  const executedRebuys = new Set(
-    trades
-      .filter((trade) => trade.type === 'RECOMPRA' && trade.rebuySource)
-      .map((trade) => trade.rebuySource!.realizationId)
-  )
-
-  for (const trade of trades) {
-    if (tradeId && trade.id !== tradeId) continue
-    for (const realization of trade.realizations) {
-
-      // Realizações sem target não geram oportunidade de recompra
-      if (realization.targetLevel <= 0) continue
-
-      // Oportunidade já descartada
-      if (realization.rebuyStatus === 'DISMISSED') continue
-
-      // Já houve recompra desta realização
-      if (executedRebuys.has(realization.id)) {
-        continue
-      }
-
-      const currentPrice = prices[trade.coinId]?.[currencyKey]
-
-      if (!currentPrice || currentPrice <= 0) continue
-
-      const triggerPrice =
-        realization.exitPrice * (1 - REBUY_DROP_PERCENTAGE / 100)
-
-      // O preço atingiu a queda configurada para recompra.
-      if (currentPrice > triggerPrice) continue
-
-      const realizationValue =
-        realization.exitPrice * realization.quantity
-
-      const suggestedQuantity =
-        realizationValue / currentPrice
-
-      const alert = {
-        trade,
-        realizationId: realization.id,
-        targetLevel: realization.targetLevel,
-        realizationPrice: realization.exitPrice,
-        triggerPrice,
-        currentPrice,
-        realizationValue,
-        suggestedQuantity,
-      }
-
-      if (realization.rebuyStatus === 'DISMISSED') {
-        dismissedAlerts.push(alert)
-      } else {
-        alerts.push(alert)
-      }
-    }
-  }
+  const { alerts, dismissedAlerts } = computeRebuyAlerts(trades, prices, currency, tradeId)
 
   if (alerts.length === 0 && dismissedAlerts.length === 0) {
     return null

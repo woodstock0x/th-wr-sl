@@ -1,4 +1,5 @@
 import type { Realization, Trade } from './types'
+import { isEffectivelyZero, roundQuantity } from './precision'
 
 export function updateTradeById(
   trades: Trade[],
@@ -28,7 +29,10 @@ export function getRealizationProfit(
 }
 
 export function getRemainingQuantity(trade: Trade, realizations: Realization[]): number {
-  return trade.quantity - (trade.fee || 0) - realizations.reduce((sum, realization) => sum + realization.quantity, 0)
+  const raw = trade.quantity - (trade.fee || 0) - realizations.reduce((sum, realization) => sum + realization.quantity, 0)
+  const rounded = roundQuantity(raw)
+  // Uma venda "tudo que resta" não deve deixar poeira de ponto flutuante negativa.
+  return isEffectivelyZero(rounded) ? 0 : Math.max(0, rounded)
 }
 
 export function getTargetsHit(realizations: Realization[]): number[] {

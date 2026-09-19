@@ -27,7 +27,18 @@ import {
   SidebarSeparator,
 } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { exportData, downloadJSON, importData } from '@/lib/storage'
+import { useState } from 'react'
 import { toast } from 'sonner'
 
 const mainNavItems = [
@@ -60,6 +71,7 @@ const mainNavItems = [
 
 export function AppSidebar() {
   const pathname = usePathname()
+  const [pendingImport, setPendingImport] = useState<string | null>(null)
 
   const handleExport = () => {
     try {
@@ -79,6 +91,7 @@ export function AppSidebar() {
       toast.error('Erro ao exportar dados')
     }
   }
+
   const handleImport = () => {
     const input = document.createElement('input')
     input.type = 'file'
@@ -87,16 +100,28 @@ export function AppSidebar() {
       const file = (e.target as HTMLInputElement).files?.[0]
       if (!file) return
 
-      try {
-        const text = await file.text()
-        importData(text)
-        toast.success('Dados importados com sucesso! Recarregando...')
-        setTimeout(() => window.location.reload(), 1000)
-      } catch {
-        toast.error('Erro ao importar dados. Verifique o arquivo.')
-      }
+      const text = await file.text()
+      setPendingImport(text)
     }
     input.click()
+  }
+
+  const confirmImport = () => {
+    if (!pendingImport) return
+
+    const result = importData(pendingImport)
+    setPendingImport(null)
+
+    if (!result.success) {
+      console.error('Erro ao importar dados:', result.errors)
+      toast.error(
+        `Arquivo inválido, nada foi alterado: ${result.errors[0] ?? 'formato desconhecido'}${result.errors.length > 1 ? ` (+${result.errors.length - 1} outro(s) erro(s))` : ''}`
+      )
+      return
+    }
+
+    toast.success('Dados importados com sucesso! Um backup do estado anterior foi salvo. Recarregando...')
+    setTimeout(() => window.location.reload(), 1000)
   }
 
   return (
@@ -156,6 +181,27 @@ export function AppSidebar() {
           </Button>
         </div>
       </SidebarFooter>
+
+      <AlertDialog open={pendingImport !== null} onOpenChange={(open) => !open && setPendingImport(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Substituir todos os dados?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Isso vai substituir todos os trades, o ledger e as configurações atuais pelo conteúdo do
+              arquivo importado. Um backup automático do estado atual será salvo antes, e pode ser
+              restaurado em Configurações.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="cursor-pointer">Cancelar</AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button className="cursor-pointer" onClick={confirmImport}>
+                Importar e substituir
+              </Button>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Sidebar>
   )
 }

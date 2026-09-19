@@ -105,6 +105,8 @@ export interface Settings {
   currency: 'BRL' | 'USD'
 
   theme: 'light' | 'dark' | 'system'
+
+  notificationsEnabled?: boolean
 }
 
 export interface CoinGeckoPrice {
@@ -138,6 +140,7 @@ export interface PortfolioSummary {
 }
 
 export interface ExportedData {
+  schemaVersion?: number
   trades: Trade[]
   settings: Settings
   ledger: LedgerEntry[]
@@ -166,4 +169,6 @@ export const DEFAULT_SETTINGS: Settings = {
   currency: 'USD',
 
   theme: 'dark',
+
+  notificationsEnabled: false,
 }

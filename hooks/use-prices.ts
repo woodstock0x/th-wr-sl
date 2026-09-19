@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { CoinGeckoPrice } from '@/lib/types'
 import { getPrices } from '@/lib/coingecko'
 
@@ -12,16 +12,25 @@ export function usePrices(coinIds: string[]) {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [error, setError] = useState<string | null>(null)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const inFlightRef = useRef(false)
+
+  // Chave estável: `coinIds` costuma chegar como um array novo a cada
+  // render (ex.: `trades.map(...)` sem useMemo no chamador). Sem isso, o
+  // efeito abaixo reexecuta a cada render, reiniciando o intervalo e
+  // multiplicando chamadas à API pública do CoinGecko (que tem rate limit
+  // agressivo) mesmo quando a lista de moedas não mudou de fato.
+  const idsKey = useMemo(() => [...new Set(coinIds)].sort().join(','), [coinIds])
 
   const fetchPrices = useCallback(async () => {
-    if (coinIds.length === 0) return
+    if (!idsKey) return
+    if (inFlightRef.current) return
+    inFlightRef.current = true
 
     setIsLoading(true)
     setError(null)
 
     try {
-      const uniqueIds = [...new Set(coinIds)]
-      const data = await getPrices(uniqueIds)
+      const data = await getPrices(idsKey.split(','))
       setPrices(data)
       setLastUpdated(new Date())
     } catch (err) {
@@ -29,8 +38,9 @@ export function usePrices(coinIds: string[]) {
       console.error(err)
     } finally {
       setIsLoading(false)
+      inFlightRef.current = false
     }
-  }, [coinIds])
+  }, [idsKey])
 
   useEffect(() => {
     fetchPrices()

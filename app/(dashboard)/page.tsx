@@ -12,6 +12,7 @@ import { RebuyAlerts } from '@/components/trades/rebuy-alerts'
 import { useTrades } from '@/hooks/use-trades'
 import { usePrices } from '@/hooks/use-prices'
 import { useSettings } from '@/hooks/use-settings'
+import { useAlertNotifications } from '@/hooks/use-alert-notifications'
 import { calculatePortfolioSummary } from '@/lib/calculations'
 import { ledgerCashBalance } from '@/lib/ledger'
 
@@ -44,6 +45,8 @@ export default function DashboardPage() {
     () => calculatePortfolioSummary(trades, prices, settings.currency),
     [trades, prices, settings.currency]
   )
+
+  useAlertNotifications(activeTrades, prices, settings)
 
   const cashBalance = summary.cashBalance
 
